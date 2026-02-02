@@ -1,0 +1,50 @@
+name: SQL Linting
+
+on:
+  push:
+    branches: [ main, development ]
+    paths:
+      - 'dbt_project/models/**/*.sql'
+      - 'dbt_project/macros/**/*.sql'
+      - '.github/workflows/sql_lint.yml'
+  pull_request:
+    branches: [ main ]
+    paths:
+      - 'dbt_project/models/**/*.sql'
+      - 'dbt_project/macros/**/*.sql'
+
+jobs:
+  sqlfluff:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.11'
+
+      - name: Install SQLFluff
+        run: pip install sqlfluff sqlfluff-templater-dbt
+
+      - name: Create SQLFluff config
+        run: |
+          cat > .sqlfluff << 'CONFIG'
+          [sqlfluff]
+          templater = dbt
+          dialect = postgres
+          exclude_rules = L003,L009,L016,L031,L034,L036
+          max_line_length = 120
+
+          [sqlfluff:rules:L010]
+          capitalisation_policy = lower
+
+          [sqlfluff:templater:dbt]
+          project_dir = dbt_project
+          CONFIG
+
+      - name: Lint SQL files
+        run: |
+          sqlfluff lint dbt_project/models --format github-annotation || echo "SQL linting issues found (not blocking)"

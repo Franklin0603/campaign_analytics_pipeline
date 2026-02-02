@@ -7,6 +7,8 @@
 [![dbt](https://img.shields.io/badge/dbt-1.9.0-red.svg)](https://www.getdbt.com/)
 [![PostgreSQL](https://img.shields.io/badge/PostgreSQL-15+-blue.svg)](https://www.postgresql.org/)
 [![Docker](https://img.shields.io/badge/Docker-ready-blue.svg)](https://www.docker.com/)
+[![dbt CI](https://github.com/Franklin0603/campaign_analytics_pipeline/actions/workflows/dbt_ci.yml/badge.svg)](https://github.com/Franklin0603/campaign_analytics_pipeline/actions/workflows/dbt_ci.yml)
+[![Python Lint](https://github.com/Franklin0603/campaign_analytics_pipeline/actions/workflows/python_lint.yml/badge.svg)](https://github.com/Franklin0603/campaign_analytics_pipeline/actions/workflows/python_lint.yml)
 
 ## 📋 Overview
 
@@ -18,12 +20,8 @@ This project demonstrates a **production-ready data pipeline** for campaign anal
 - ✅ **Great Expectations** for data quality validation
 - ✅ **PostgreSQL** as the data warehouse
 - ✅ **Docker** for easy setup and reproducibility
+- ✅ **CI/CD** with GitHub Actions (automated testing)
 - ✅ **Modular, testable, and maintainable** code structure
-
-### Architecture
-```
-CSV Files (Raw Data)
-     ↓
 ┌─────────────────┐
 │  BRONZE LAYER   │  ← Raw data preservation
 │  (PySpark)      │     • Campaigns

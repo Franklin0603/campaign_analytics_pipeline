@@ -1,0 +1,103 @@
+name: dbt CI
+
+on:
+  push:
+    branches: [ main, development ]
+    paths:
+      - 'dbt_project/**'
+      - '.github/workflows/dbt_ci.yml'
+  pull_request:
+    branches: [ main ]
+    paths:
+      - 'dbt_project/**'
+
+jobs:
+  dbt-test:
+    runs-on: ubuntu-latest
+    
+    services:
+      postgres:
+        image: postgres:15
+        env:
+          POSTGRES_USER: dbt_user
+          POSTGRES_PASSWORD: dbt_password
+          POSTGRES_DB: campaign_analytics
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+        ports:
+          - 5432:5432
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.11'
+
+      - name: Install dbt
+        run: |
+          pip install dbt-postgres==1.9.0
+          dbt --version
+
+      - name: Setup database schemas
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y postgresql-client
+          PGPASSWORD=dbt_password psql -h localhost -U dbt_user -d campaign_analytics -f scripts/init_db.sql
+
+      - name: Configure dbt profile
+        run: |
+          mkdir -p ~/.dbt
+          cat > ~/.dbt/profiles.yml << 'PROFILE'
+          campaign_analytics:
+            target: ci
+            outputs:
+              ci:
+                type: postgres
+                host: localhost
+                user: dbt_user
+                password: dbt_password
+                port: 5432
+                dbname: campaign_analytics
+                schema: analytics
+                threads: 4
+                search_path: "gold,core,analytics,intermediate,staging,silver,bronze,public"
+          PROFILE
+
+      - name: dbt Debug
+        working-directory: dbt_project
+        run: dbt debug
+
+      - name: Install dbt dependencies
+        working-directory: dbt_project
+        run: dbt deps
+
+      - name: dbt Compile
+        working-directory: dbt_project
+        run: dbt compile
+
+      - name: dbt Run (build models)
+        working-directory: dbt_project
+        run: dbt run
+
+      - name: dbt Test
+        working-directory: dbt_project
+        run: dbt test
+
+      - name: Generate dbt docs
+        working-directory: dbt_project
+        run: dbt docs generate
+
+      - name: Upload dbt artifacts
+        uses: actions/upload-artifact@v3
+        with:
+          name: dbt-artifacts
+          path: |
+            dbt_project/target/manifest.json
+            dbt_project/target/catalog.json
+            dbt_project/target/run_results.json

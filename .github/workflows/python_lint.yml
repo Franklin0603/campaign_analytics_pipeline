@@ -1,0 +1,42 @@
+name: Python Linting
+
+on:
+  push:
+    branches: [ main, development ]
+    paths:
+      - '**.py'
+      - '.github/workflows/python_lint.yml'
+  pull_request:
+    branches: [ main ]
+    paths:
+      - '**.py'
+
+jobs:
+  lint:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.11'
+
+      - name: Install linting tools
+        run: |
+          pip install flake8 black isort
+
+      - name: Run Black (formatting check)
+        run: |
+          black --check --diff pipeline/ || echo "Black formatting issues found (not blocking)"
+
+      - name: Run isort (import sorting check)
+        run: |
+          isort --check-only --diff pipeline/ || echo "Import sorting issues found (not blocking)"
+
+      - name: Run Flake8 (style guide)
+        run: |
+          flake8 pipeline/ --count --select=E9,F63,F7,F82 --show-source --statistics
+          flake8 pipeline/ --count --exit-zero --max-complexity=10 --max-line-length=127 --statistics
