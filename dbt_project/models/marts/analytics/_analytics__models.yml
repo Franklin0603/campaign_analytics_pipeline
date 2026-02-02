@@ -1,0 +1,39 @@
+version: 2
+
+models:
+  - name: campaign_performance_summary
+    description: "Campaign-level aggregated performance summary for reporting and BI tools"
+    meta:
+      owner: "Data Engineering Team"
+      layer: "marts/analytics"
+      primary_use: "Tableau/Looker dashboards"
+    columns:
+      - name: campaign_id
+        description: "Unique campaign identifier"
+        tests:
+          - unique
+          - not_null
+      
+      - name: campaign_name
+        description: "Campaign name"
+      
+      - name: advertiser_name
+        description: "Advertiser company name"
+      
+      - name: total_revenue_usd
+        description: "Total campaign revenue (all-time)"
+      
+      - name: total_cost_usd
+        description: "Total campaign cost (all-time)"
+      
+      - name: total_profit_usd
+        description: "Total campaign profit (revenue - cost)"
+      
+      - name: total_roi_percent
+        description: "Overall campaign ROI"
+      
+      - name: performance_tier
+        description: "Performance categorization based on ROI"
+        tests:
+          - accepted_values:
+              values: ['Excellent', 'Good', 'Fair', 'Poor', 'Unknown']

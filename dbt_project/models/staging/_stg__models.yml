@@ -1,0 +1,153 @@
+version: 2
+
+models:
+  - name: stg_advertisers
+    description: "Staging model for advertisers - light transformation from Silver layer"
+    meta:
+      owner: "Data Engineering Team"
+      layer: "staging"
+    columns:
+      - name: advertiser_id
+        description: "Unique advertiser identifier (primary key)"
+        tests:
+          - unique
+          - not_null
+      
+      - name: advertiser_name
+        description: "Advertiser company name"
+        tests:
+          - not_null
+      
+      - name: industry
+        description: "Industry vertical"
+        tests:
+          - not_null
+      
+      - name: country_code
+        description: "ISO 2-letter country code"
+        tests:
+          - not_null
+      
+      - name: account_manager
+        description: "Assigned account manager"
+      
+      - name: silver_loaded_at
+        description: "Timestamp when loaded into Silver layer"
+        tests:
+          - not_null
+
+  - name: stg_campaigns
+    description: "Staging model for campaigns - standardized column names"
+    meta:
+      owner: "Data Engineering Team"
+      layer: "staging"
+    columns:
+      - name: campaign_id
+        description: "Unique campaign identifier (primary key)"
+        tests:
+          - unique
+          - not_null
+      
+      - name: advertiser_id
+        description: "Foreign key to advertisers"
+        tests:
+          - not_null
+      
+      - name: campaign_name
+        description: "Campaign name"
+        tests:
+          - not_null
+      
+      - name: campaign_type
+        description: "Campaign type (Search, Display, Video, Social, Shopping)"
+        tests:
+          - not_null
+      
+      - name: campaign_status
+        description: "Current campaign status"
+        tests:
+          - not_null
+          - accepted_values:
+              values: ['Active', 'Paused', 'Completed', 'Draft']
+      
+      - name: campaign_objective
+        description: "Campaign objective"
+        tests:
+          - not_null
+      
+      - name: campaign_start_date
+        description: "Campaign start date"
+        tests:
+          - not_null
+      
+      - name: campaign_end_date
+        description: "Campaign end date"
+        tests:
+          - not_null
+      
+      - name: daily_budget_usd
+        description: "Daily budget in USD"
+        tests:
+          - not_null
+      
+      - name: total_budget_usd
+        description: "Total campaign budget in USD"
+        tests:
+          - not_null
+      
+      - name: silver_loaded_at
+        description: "Timestamp when loaded into Silver layer"
+        tests:
+          - not_null
+
+  - name: stg_performance
+    description: "Staging model for daily campaign performance"
+    meta:
+      owner: "Data Engineering Team"
+      layer: "staging"
+    columns:
+      - name: performance_id
+        description: "Unique performance record identifier (primary key)"
+        tests:
+          - unique
+          - not_null
+      
+      - name: campaign_id
+        description: "Foreign key to campaigns"
+        tests:
+          - not_null
+      
+      - name: performance_date
+        description: "Date of performance metrics"
+        tests:
+          - not_null
+      
+      - name: impressions
+        description: "Number of ad impressions"
+        tests:
+          - not_null
+      
+      - name: clicks
+        description: "Number of clicks"
+        tests:
+          - not_null
+      
+      - name: conversions
+        description: "Number of conversions"
+        tests:
+          - not_null
+      
+      - name: cost_usd
+        description: "Total cost in USD"
+        tests:
+          - not_null
+      
+      - name: revenue_usd
+        description: "Total revenue in USD"
+        tests:
+          - not_null
+      
+      - name: silver_loaded_at
+        description: "Timestamp when loaded into Silver layer"
+        tests:
+          - not_null

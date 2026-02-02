@@ -1,0 +1,139 @@
+version: 2
+
+sources:
+  - name: silver
+    description: "Silver layer - cleaned and validated data from PySpark pipeline"
+    database: campaign_analytics
+    schema: silver
+    
+    # Freshness checks
+    freshness:
+      warn_after: {count: 24, period: hour}
+      error_after: {count: 48, period: hour}
+    
+    tables:
+      - name: advertisers
+        description: "Cleaned advertiser dimension"
+        loaded_at_field: _silver_processed_at
+        columns:
+          - name: advertiser_id
+            description: "Unique advertiser identifier"
+            tests:
+              - unique
+              - not_null
+          
+          - name: advertiser_name
+            description: "Advertiser company name"
+            tests:
+              - not_null
+          
+          - name: industry
+            description: "Industry vertical"
+            tests:
+              - not_null
+          
+          - name: country
+            description: "Country code"
+            tests:
+              - not_null
+          
+          - name: _silver_processed_at
+            description: "Silver processing timestamp"
+      
+      - name: campaigns
+        description: "Cleaned campaign dimension"
+        loaded_at_field: _silver_processed_at
+        columns:
+          - name: campaign_id
+            description: "Unique campaign identifier"
+            tests:
+              - unique
+              - not_null
+          
+          - name: advertiser_id
+            description: "Foreign key to advertisers"
+            tests:
+              - not_null
+          
+          - name: campaign_name
+            description: "Campaign name"
+            tests:
+              - not_null
+          
+          - name: campaign_type
+            description: "Campaign type"
+            tests:
+              - not_null
+          
+          - name: start_date
+            description: "Campaign start date"
+            tests:
+              - not_null
+          
+          - name: end_date
+            description: "Campaign end date"
+            tests:
+              - not_null
+          
+          - name: budget_daily
+            description: "Daily budget"
+          
+          - name: budget_total
+            description: "Total budget"
+          
+          - name: status
+            description: "Campaign status"
+          
+          - name: objective
+            description: "Campaign objective"
+          
+          - name: _silver_processed_at
+            description: "Silver processing timestamp"
+      
+      - name: performance
+        description: "Cleaned performance fact data"
+        loaded_at_field: _silver_processed_at
+        columns:
+          - name: performance_id
+            description: "Unique performance record identifier"
+            tests:
+              - unique
+              - not_null
+          
+          - name: campaign_id
+            description: "Foreign key to campaigns"
+            tests:
+              - not_null
+          
+          - name: date
+            description: "Performance date"
+            tests:
+              - not_null
+          
+          - name: impressions
+            description: "Ad impressions"
+            tests:
+              - not_null
+          
+          - name: clicks
+            description: "Ad clicks"
+            tests:
+              - not_null
+          
+          - name: conversions
+            description: "Conversions"
+            tests:
+              - not_null
+          
+          - name: cost
+            description: "Cost in USD"
+            tests:
+              - not_null
+          
+          - name: revenue
+            description: "Revenue in USD"
+            tests:
+              - not_null
+          
+          - name: _silver_processed_at
+            description: "Silver processing timestamp"

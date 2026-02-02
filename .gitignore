@@ -1,0 +1,72 @@
+# Python
+
+# Python
+*.pyc
+__pycache__/
+*.py[cod]
+*$py.class
+.Python
+venv/
+env/
+ENV/
+*.egg-info/
+dist/
+build/
+
+# Environment variables - CRITICAL: NEVER COMMIT
+.env
+.env.local
+*.local
+
+# PySpark
+metastore_db/
+derby.log
+spark-warehouse/
+
+# dbt
+dbt_project/target/
+dbt_project/dbt_packages/
+dbt_project/logs/
+dbt_project/.user.yml
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+.DS_Store
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Testing
+.pytest_cache/
+.coverage
+htmlcov/
+
+# Jupyter
+.ipynb_checkpoints/
+*.ipynb
+
+# Backup files
+*.bak
+*.backup
+*~
+
+# Logs
+*.log
+logs/
+
+# Data (optional - uncomment if you don't want to commit data)
+# data/raw/*.csv
+
+# Configuration (keep template, ignore with credentials)
+# config/database.yaml
+
+# Quality reports
+quality_reports/*.json
+quality_reports/*.html
+
+# PostgreSQL
+*.sql~

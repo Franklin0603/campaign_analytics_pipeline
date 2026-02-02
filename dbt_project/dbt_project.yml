@@ -1,0 +1,78 @@
+name: 'campaign_analytics'
+version: '1.0.0'
+config-version: 2
+
+# Profile to use (references profiles.yml)
+profile: 'campaign_analytics'
+
+# Directories
+model-paths: ["models"]
+analysis-paths: ["analyses"]
+test-paths: ["tests"]
+seed-paths: ["seeds"]
+macro-paths: ["macros"]
+snapshot-paths: ["snapshots"]
+
+# Compilation settings
+target-path: "target"
+clean-targets:
+  - "target"
+  - "dbt_packages"
+
+# Model configurations
+models:
+  campaign_analytics:
+    # Staging models - 1:1 with source tables
+    staging:
+      +materialized: view
+      +schema: staging
+      +tags: ["staging"]
+      campaign_analytics:
+        +docs:
+          node_color: "#D4A5A5"  # Light red for staging
+    
+    # Intermediate models - business logic
+    intermediate:
+      +materialized: view
+      +schema: intermediate  
+      +tags: ["intermediate"]
+      campaign_analytics:
+        +docs:
+          node_color: "#A5D4D4"  # Light blue for intermediate
+    
+    # Marts - final business models
+    marts:
+      core:
+        +materialized: table
+        +schema: core
+        +tags: ["marts", "core"]
+        +docs:
+          node_color: "#A5D4A5"  # Light green for marts
+      
+      analytics:
+        +materialized: view
+        +schema: analytics
+        +tags: ["marts", "analytics"]
+        +docs:
+          node_color: "#D4D4A5"  # Light yellow for analytics
+
+# Seeds configuration
+seeds:
+  campaign_analytics:
+    +schema: seeds
+    +tags: ["seeds"]
+
+# Snapshots configuration  
+snapshots:
+  campaign_analytics:
+    +target_schema: snapshots
+    +tags: ["snapshots"]
+
+# Variables
+vars:
+  # Development period for testing
+  test_start_date: '2024-01-01'
+  test_end_date: '2024-12-31'
+
+# Documentation
+docs-paths: ["docs"]

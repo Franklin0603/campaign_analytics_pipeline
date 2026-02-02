@@ -1,0 +1,58 @@
+version: 2
+
+models:
+  - name: dim_advertisers
+    description: "Advertiser dimension - master data for all advertisers"
+    meta:
+      owner: "Data Engineering Team"
+      layer: "marts/core"
+    columns:
+      - name: advertiser_id
+        description: "Primary key"
+        tests:
+          - unique
+          - not_null
+      
+      - name: advertiser_name
+        description: "Advertiser company name"
+        tests:
+          - not_null
+
+  - name: dim_campaigns
+    description: "Campaign dimension - master data for all campaigns with advertiser context"
+    meta:
+      owner: "Data Engineering Team"
+      layer: "marts/core"
+    columns:
+      - name: campaign_id
+        description: "Primary key"
+        tests:
+          - unique
+          - not_null
+      
+      - name: advertiser_id
+        description: "Foreign key to dim_advertisers"
+        tests:
+          - not_null
+
+  - name: fact_performance
+    description: "Daily campaign performance fact table with all KPIs"
+    meta:
+      owner: "Data Engineering Team"
+      layer: "marts/core"
+    columns:
+      - name: performance_id
+        description: "Primary key"
+        tests:
+          - unique
+          - not_null
+      
+      - name: campaign_id
+        description: "Foreign key to dim_campaigns"
+        tests:
+          - not_null
+      
+      - name: performance_date
+        description: "Date of metrics"
+        tests:
+          - not_null

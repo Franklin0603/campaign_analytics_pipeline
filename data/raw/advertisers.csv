@@ -1,0 +1,54 @@
+advertiser_id,advertiser_name,industry,country,account_manager
+1,GlobalRetail,Retail,JP,Lisa Thompson
+2,RealEstate,Automotive,FR,Emily Rodriguez
+3,FinanceFirst,Healthcare,US,Lisa Thompson
+4,GlobalRetail,Automotive,FR,Sarah Johnson
+5,FitnessPro,Finance,FR,James Wilson
+6,FitnessPro,Retail,US,David Kim
+7,FitnessPro,Education,UK,Emily Rodriguez
+8,EduLearn,Automotive,BR,James Wilson
+9,FoodDelivery,Healthcare,JP,Sarah Johnson
+10,StreamFlix,Education,UK,James Wilson
+11,TechCorp,Travel,FR,Emily Rodriguez
+12,FinanceFirst,Healthcare,BR,Emily Rodriguez
+13,FinanceFirst,Healthcare,FR,Emily Rodriguez
+14,TechCorp,Education,FR,James Wilson
+15,HealthPlus,Education,JP,James Wilson
+16,GameZone,Education,AU,Sarah Johnson
+17,FoodDelivery 17,Entertainment,CA,Sarah Johnson
+18,FoodDelivery 18,Automotive,FR,David Kim
+19,TravelEasy 19,Entertainment,AU,David Kim
+20,GameZone 20,Technology,BR,James Wilson
+21,FitnessPro 21,Automotive,UK,Mike Chen
+22,FoodDelivery 22,Retail,BR,James Wilson
+23,DataAnalytics 23,Entertainment,UK,James Wilson
+24,FinanceFirst 24,Technology,DE,James Wilson
+25,TravelEasy 25,Healthcare,CA,Lisa Thompson
+26,FitnessPro 26,Retail,DE,Sarah Johnson
+27,EduLearn 27,Travel,US,Emily Rodriguez
+28,DataAnalytics 28,Technology,FR,James Wilson
+29,CloudSystems 29,Automotive,AU,Lisa Thompson
+30,FitnessPro 30,Travel,DE,Mike Chen
+31,FoodDelivery 31,Travel,UK,James Wilson
+32,InsuranceHub 32,Retail,FR,Emily Rodriguez
+33,SmartHome 33,Education,FR,James Wilson
+34,StreamFlix 34,Travel,DE,Emily Rodriguez
+35,GameZone 35,Technology,JP,Sarah Johnson
+36,TechCorp 36,Entertainment,US,David Kim
+37,FinanceFirst 37,Travel,DE,Mike Chen
+38,SmartHome 38,Education,DE,Lisa Thompson
+39,StreamFlix 39,Healthcare,FR,Emily Rodriguez
+40,FoodDelivery 40,Technology,UK,Emily Rodriguez
+41,FitnessPro 41,Healthcare,AU,James Wilson
+42,FitnessPro 42,Education,UK,Lisa Thompson
+43,FinanceFirst 43,Retail,UK,Lisa Thompson
+44,HealthPlus 44,Entertainment,FR,David Kim
+45,TravelEasy 45,Finance,BR,James Wilson
+46,GameZone 46,Automotive,BR,David Kim
+47,DataAnalytics 47,Finance,BR,Lisa Thompson
+48,GlobalRetail 48,Healthcare,UK,Sarah Johnson
+49,SmartHome 49,Retail,FR,David Kim
+50,StreamFlix 50,Education,FR,James Wilson
+1,GlobalRetail,Retail,JP,Lisa Thompson
+2,RealEstate,Automotive,FR,Emily Rodriguez
+51,FinanceFirst,,US,Lisa Thompson

@@ -1,0 +1,170 @@
+version: 2
+
+models:
+  - name: int_campaigns_enriched
+    description: "Campaigns joined with advertiser data and derived business logic fields"
+    meta:
+      owner: "Data Engineering Team"
+      layer: "intermediate"
+    columns:
+      - name: campaign_id
+        description: "Primary key"
+        tests:
+          - unique
+          - not_null
+      
+      - name: advertiser_id
+        description: "Foreign key to advertisers"
+        tests:
+          - not_null
+      
+      - name: campaign_name
+        description: "Campaign name"
+        tests:
+          - not_null
+      
+      - name: advertiser_name
+        description: "Advertiser company name (joined from advertisers)"
+        tests:
+          - not_null
+      
+      - name: industry
+        description: "Advertiser industry"
+        tests:
+          - not_null
+      
+      - name: campaign_duration_days
+        description: "Campaign duration in days (derived)"
+        tests:
+          - is_non_negative
+      
+      - name: campaign_current_state
+        description: "Current state of campaign based on dates and status"
+        tests:
+          - accepted_values:
+              values: ['Running', 'Scheduled', 'Ended', 'Paused', 'Completed', 'Draft', 'Unknown']
+      
+      - name: is_currently_active
+        description: "Boolean flag - is campaign running today"
+        tests:
+          - accepted_values:
+              values: [true, false]
+      
+      - name: expected_daily_spend
+        description: "Expected daily spend based on total budget and duration"
+        tests:
+          - is_non_negative
+
+  - name: int_performance_metrics
+    description: "Performance data with all calculated KPIs and business metrics"
+    meta:
+      owner: "Data Engineering Team"
+      layer: "intermediate"
+    tests:
+      - clicks_lte_impressions:
+          click_column: clicks
+          impression_column: impressions
+      - conversions_lte_clicks:
+          conversion_column: conversions
+          click_column: clicks
+    columns:
+      - name: performance_id
+        description: "Primary key"
+        tests:
+          - unique
+          - not_null
+      
+      - name: campaign_id
+        description: "Foreign key to campaigns"
+        tests:
+          - not_null
+
+      - name: performance_date
+        description: "Date of performance metrics"
+        tests:
+          - not_null
+      
+      - name: impressions
+        description: "Number of ad impressions"
+        tests:
+          - not_null
+          - is_non_negative
+      
+      - name: clicks
+        description: "Number of ad clicks"
+        tests:
+          - not_null
+          - is_non_negative
+      
+      - name: conversions
+        description: "Number of conversions"
+        tests:
+          - not_null
+          - is_non_negative
+      
+      - name: cost_usd
+        description: "Total cost in USD"
+        tests:
+          - not_null
+          - is_non_negative
+      
+      - name: revenue_usd
+        description: "Total revenue in USD"
+        tests:
+          - not_null
+          - is_non_negative
+      
+      - name: ctr_percent
+        description: "Click-through rate (clicks/impressions * 100)"
+        tests:
+          - is_percentage
+      
+      - name: cvr_percent
+        description: "Conversion rate (conversions/clicks * 100)"
+        tests:
+          - is_percentage
+      
+      - name: cpc_usd
+        description: "Cost per click"
+        tests:
+          - is_non_negative
+      
+      - name: cpm_usd
+        description: "Cost per thousand impressions"
+        tests:
+          - is_non_negative
+      
+      - name: cpa_usd
+        description: "Cost per acquisition/conversion"
+        tests:
+          - is_non_negative
+      
+      - name: roi_percent
+        description: "Return on investment ((revenue-cost)/cost * 100)"
+      
+      - name: profit_usd
+        description: "Profit (revenue - cost)"
+      
+      - name: performance_tier
+        description: "Performance categorization based on ROI"
+        tests:
+          - accepted_values:
+              values: ['Excellent', 'Good', 'Fair', 'Poor', 'Unknown']
+      
+      - name: is_profitable
+        description: "Boolean - is revenue > cost"
+        tests:
+          - accepted_values:
+              values: [true, false]
+      
+      - name: has_invalid_clicks
+        description: "Data quality flag - clicks > impressions"
+        tests:
+          - accepted_values:
+              values: [true, false]
+      
+      - name: has_invalid_conversions
+        description: "Data quality flag - conversions > clicks"
+        tests:
+          - accepted_values:
+              values: [true, false]
