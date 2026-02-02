@@ -4,8 +4,9 @@
 
 [![Python](https://img.shields.io/badge/Python-3.8+-blue.svg)](https://www.python.org/downloads/)
 [![PySpark](https://img.shields.io/badge/PySpark-3.4.0-orange.svg)](https://spark.apache.org/)
-[![dbt](https://img.shields.io/badge/dbt-1.8+-red.svg)](https://www.getdbt.com/)
+[![dbt](https://img.shields.io/badge/dbt-1.9.0-red.svg)](https://www.getdbt.com/)
 [![PostgreSQL](https://img.shields.io/badge/PostgreSQL-15+-blue.svg)](https://www.postgresql.org/)
+[![Docker](https://img.shields.io/badge/Docker-ready-blue.svg)](https://www.docker.com/)
 
 ## 📋 Overview
 
@@ -16,10 +17,10 @@ This project demonstrates a **production-ready data pipeline** for campaign anal
 - ✅ **dbt** for analytics engineering
 - ✅ **Great Expectations** for data quality validation
 - ✅ **PostgreSQL** as the data warehouse
+- ✅ **Docker** for easy setup and reproducibility
 - ✅ **Modular, testable, and maintainable** code structure
 
 ### Architecture
-
 ```
 CSV Files (Raw Data)
      ↓
@@ -48,18 +49,54 @@ CSV Files (Raw Data)
 
 ## 🚀 Quick Start
 
-### Prerequisites
+### Option 1: Docker Setup (Recommended) 🐳
+
+**Fastest way to get started!**
+```bash
+# 1. Clone the repository
+git clone https://github.com/Franklin0603/campaign_analytics_pipeline.git
+cd campaign_analytics_pipeline
+
+# 2. Start PostgreSQL with Docker
+docker compose up -d
+
+# 3. Verify database is running
+docker ps
+# Should see: campaign_analytics_db
+
+# 4. Create virtual environment and install dependencies
+python3 -m venv venv
+source venv/bin/activate
+pip install -r requirements.txt
+
+# 5. Run the pipeline
+python run_pipeline.py
+
+# 6. Run dbt models
+cd dbt_project
+dbt run
+dbt test
+```
+
+**That's it!** Database is ready with all schemas created automatically.
+
+📖 **For detailed Docker instructions, see [DOCKER_SETUP.md](DOCKER_SETUP.md)**
+
+---
+
+### Option 2: Manual Setup
+
+#### Prerequisites
 
 - Python 3.8+
-- PostgreSQL 15+
+- PostgreSQL 15+ (installed locally)
 - Java 8+ (for PySpark)
 - 2GB RAM minimum
 
-### Installation
-
+#### Installation
 ```bash
 # 1. Clone the repository
-git clone <your-repo-url>
+git clone https://github.com/Franklin0603/campaign_analytics_pipeline.git
 cd campaign_analytics_pipeline
 
 # 2. Create virtual environment
@@ -80,10 +117,9 @@ createdb campaign_analytics
 psql campaign_analytics < sql/create_schemas.sql
 ```
 
-### Configuration
+#### Configuration
 
 Edit `config/database.yaml` with your PostgreSQL credentials:
-
 ```yaml
 postgres:
   host: localhost
@@ -93,8 +129,7 @@ postgres:
   password: "your_password"  # Add your password
 ```
 
-### Run the Pipeline
-
+#### Run the Pipeline
 ```bash
 # Run Bronze → Silver layers
 python run_pipeline.py
@@ -112,7 +147,6 @@ dbt docs serve
 ```
 
 ## 📁 Project Structure
-
 ```
 campaign_analytics_pipeline/
 ├── data/
@@ -120,7 +154,7 @@ campaign_analytics_pipeline/
 │       ├── campaigns.csv
 │       ├── performance.csv
 │       └── advertisers.csv
-├── pyspark/
+├── pipeline/
 │   ├── bronze/                 # Bronze layer ingestion
 │   │   ├── ingest_campaigns.py
 │   │   ├── ingest_performance.py
@@ -133,18 +167,28 @@ campaign_analytics_pipeline/
 │       └── spark_postgres.py
 ├── dbt_project/                # dbt analytics models
 │   ├── models/
-│   │   ├── staging/           # Staging views
-│   │   ├── intermediate/      # Business logic
-│   │   └── marts/             # Final dimensions & facts
-│   └── tests/                 # dbt tests
+│   │   ├── staging/           # Staging views (3 models)
+│   │   ├── intermediate/      # Business logic (2 models)
+│   │   └── marts/             # Final dimensions & facts (4 models)
+│   ├── macros/                # 6 custom macros
+│   ├── tests/                 # 110 data quality tests
+│   │   ├── generic/          # 6 custom generic tests
+│   │   └── singular/         # 4 singular tests
+│   └── snapshots/            # 2 SCD Type 2 snapshots
+├── scripts/
+│   └── init_db.sql            # Docker database initialization
 ├── config/
 │   └── database.yaml          # Database configuration
 ├── sql/
 │   └── create_schemas.sql     # Schema setup
 ├── quality_reports/           # Data quality reports
+├── docker-compose.yml         # Docker setup
+├── DOCKER_SETUP.md            # Docker documentation
 ├── run_pipeline.py            # Master pipeline runner
 ├── requirements.txt           # Python dependencies
-└── README.md
+├── LICENSE                    # MIT License
+├── CHANGELOG.md               # Version history
+└── README.md                  # This file
 ```
 
 ## 🔄 Pipeline Stages
@@ -172,13 +216,15 @@ campaign_analytics_pipeline/
 
 ### Gold Layer (Analytics)
 - **Purpose**: Business-ready analytics models
-- **Technology**: dbt
-- **Schema**: `analytics.*`
+- **Technology**: dbt 1.9.0
+- **Schema**: `analytics.*, core.*, staging.*`
 - **Features**:
-  - Dimension tables
-  - Fact tables with joins
-  - Aggregations
-  - Tests and documentation
+  - **9 production models**: 3 staging, 2 intermediate, 4 marts
+  - **Star schema**: 2 dimensions, 1 fact table
+  - **6 custom macros** for code reusability
+  - **110 comprehensive tests**
+  - **2 SCD Type 2 snapshots** for historical tracking
+  - Complete documentation and lineage
 
 ## 📊 Data Model
 
@@ -193,31 +239,52 @@ campaign_analytics_pipeline/
 - `silver.advertisers` - Standardized advertiser data
 
 ### Analytics Tables (Gold)
-- `analytics.dim_campaigns` - Campaign dimension
-- `analytics.dim_advertisers` - Advertiser dimension
-- `analytics.fact_performance` - Performance fact table
+- `staging.stg_campaigns` - Staging view (1:1 with silver)
+- `staging.stg_advertisers` - Staging view (1:1 with silver)
+- `staging.stg_performance` - Staging view (1:1 with silver)
+- `intermediate.int_campaigns_enriched` - Campaigns with advertiser info
+- `intermediate.int_performance_metrics` - KPI calculations
+- `core.dim_campaigns` - Campaign dimension
+- `core.dim_advertisers` - Advertiser dimension
+- `core.fact_performance` - Performance fact table (incremental)
+- `analytics.campaign_performance_summary` - Aggregated metrics
 
 ## 🔍 Data Quality
 
-The pipeline includes comprehensive data quality checks using **Great Expectations**:
+The pipeline includes comprehensive data quality checks:
 
+**PySpark Layer (Great Expectations):**
 - ✅ Schema validation
 - ✅ Null checks
 - ✅ Uniqueness constraints
 - ✅ Range validation
 - ✅ Business rule enforcement
-- ✅ Referential integrity
+
+**dbt Layer (110 Tests):**
+- ✅ Primary key uniqueness (all models)
+- ✅ Foreign key relationships
+- ✅ Custom generic tests (6):
+  - `is_percentage` - Values between 0-100
+  - `is_non_negative` - No negative values
+  - `clicks_lte_impressions` - Funnel validation
+  - `conversions_lte_clicks` - Funnel validation
+  - `end_date_after_start_date` - Date logic
+  - `recency` - Data freshness
+- ✅ Custom singular tests (4):
+  - No future performance dates
+  - Campaigns have performance data
+  - Budget consistency
+  - Metric consistency
 
 Quality check results are logged and can fail the pipeline if critical issues are detected.
 
 ## 🧪 Testing
-
 ```bash
 # Test Bronze ingestion
-python pyspark/bronze/ingest_campaigns.py
+python pipeline/bronze/ingest_campaigns.py
 
 # Test Silver transformation
-python pyspark/silver/clean_campaigns.py
+python pipeline/silver/clean_campaigns.py
 
 # Test dbt models
 cd dbt_project
@@ -225,7 +292,11 @@ dbt test
 
 # Verify data in PostgreSQL
 psql campaign_analytics -c "SELECT COUNT(*) FROM silver.campaigns;"
-psql campaign_analytics -c "SELECT * FROM analytics.dim_campaigns LIMIT 5;"
+psql campaign_analytics -c "SELECT * FROM core.dim_campaigns LIMIT 5;"
+
+# Or with Docker:
+docker exec -it campaign_analytics_db psql -U dbt_user -d campaign_analytics \
+  -c "SELECT COUNT(*) FROM core.dim_campaigns;"
 ```
 
 ## 📈 Key Metrics Calculated
@@ -233,20 +304,24 @@ psql campaign_analytics -c "SELECT * FROM analytics.dim_campaigns LIMIT 5;"
 The pipeline automatically calculates:
 
 - **Click-Through Rate (CTR)**: `(clicks / impressions) × 100`
-- **Conversion Rate**: `(conversions / clicks) × 100`
+- **Conversion Rate (CVR)**: `(conversions / clicks) × 100`
 - **Cost Per Click (CPC)**: `spend / clicks`
-- **Cost Per Conversion**: `spend / conversions`
+- **Cost Per Acquisition (CPA)**: `spend / conversions`
+- **Return on Investment (ROI)**: `((revenue - cost) / cost) × 100`
 - **Campaign Duration**: `end_date - start_date`
 - **Budget Tier**: Small (<$10K), Medium (<$50K), Large (>$50K)
+
+All calculations use safe division to handle zero values gracefully.
 
 ## 🛠️ Technologies Used
 
 | Component | Technology | Purpose |
 |-----------|-----------|---------|
 | **Data Processing** | PySpark 3.4 | Distributed data transformation |
-| **Analytics** | dbt 1.8 | SQL-based modeling |
+| **Analytics** | dbt 1.9.0 | SQL-based modeling & testing |
 | **Data Quality** | Great Expectations | Validation framework |
 | **Database** | PostgreSQL 15 | Data warehouse |
+| **Containerization** | Docker | Easy setup & reproducibility |
 | **Language** | Python 3.8+ | Pipeline orchestration |
 
 ## 🎯 Use Cases
@@ -258,15 +333,37 @@ This pipeline architecture is suitable for:
 - Multi-source data integration
 - Data quality monitoring
 - Analytics engineering workflows
+- Portfolio demonstration for data engineering roles
+
+## 🐳 Docker Management
+```bash
+# Start database
+docker compose up -d
+
+# Stop database
+docker compose down
+
+# View logs
+docker compose logs -f postgres
+
+# Access database
+docker exec -it campaign_analytics_db psql -U dbt_user -d campaign_analytics
+
+# Reset everything (deletes data!)
+docker compose down -v
+```
+
+For detailed Docker instructions, see [DOCKER_SETUP.md](DOCKER_SETUP.md).
 
 ## 📝 Development Notes
 
 ### Adding New Data Sources
 
 1. Create CSV in `data/raw/`
-2. Add ingestion script in `pyspark/bronze/`
-3. Add transformation in `pyspark/silver/`
+2. Add ingestion script in `pipeline/bronze/`
+3. Add transformation in `pipeline/silver/`
 4. Create dbt model in `dbt_project/models/`
+5. Add tests in `dbt_project/tests/`
 
 ### Extending Transformations
 
@@ -276,6 +373,14 @@ Silver layer transformations can be extended with:
 - Advanced data quality checks
 - ML feature engineering
 
+### dbt Best Practices Implemented
+- ✅ Layered architecture (staging → intermediate → marts)
+- ✅ Custom macros for DRY code (40% reduction)
+- ✅ Comprehensive testing (110 tests)
+- ✅ Incremental models for performance
+- ✅ SCD Type 2 snapshots for history
+- ✅ Complete documentation
+
 ## 🤝 Contributing
 
 Contributions welcome! Areas for enhancement:
@@ -284,17 +389,20 @@ Contributions welcome! Areas for enhancement:
 - Advanced aggregations
 - Real-time streaming ingestion
 - CI/CD pipeline
+- dbt Elementary for observability
 
 ## 📧 Contact
 
-**Franklin Ajisogun**
-- LinkedIn: [your-linkedin]
-- GitHub: [your-github]
-- Email: [your-email]
+**Franklin Ajisogun**  
+*Senior Data Analytics Engineer*
+
+- LinkedIn: [linkedin.com/in/franklin-ajisogun](https://linkedin.com/in/franklin-ajisogun)
+- GitHub: [@Franklin0603](https://github.com/Franklin0603)
+- Email: franklin.ajisogun03@gmail.com
 
 ## 📄 License
 
-MIT License - feel free to use this project for learning and portfolio purposes.
+MIT License - See [LICENSE](LICENSE) file for details.
 
 ---
 
