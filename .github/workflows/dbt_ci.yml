@@ -39,9 +39,9 @@ jobs:
         with:
           python-version: '3.11'
 
-      - name: Install dbt
+      - name: Install dependencies
         run: |
-          pip install dbt-postgres==1.9.0
+          pip install dbt-postgres==1.9.0 psycopg2-binary
           dbt --version
 
       - name: Setup database schemas
@@ -49,6 +49,12 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y postgresql-client
           PGPASSWORD=dbt_password psql -h localhost -U dbt_user -d campaign_analytics -f scripts/init_db.sql
+
+      - name: Generate sample data
+        run: python scripts/generate_ci_sample_data.py
+
+      - name: Load sample data to silver schema
+        run: python scripts/load_sample_data_to_silver.py
 
       - name: Configure dbt profile
         run: |
@@ -95,6 +101,7 @@ jobs:
 
       - name: Upload dbt artifacts
         uses: actions/upload-artifact@v3
+        if: always()
         with:
           name: dbt-artifacts
           path: |
