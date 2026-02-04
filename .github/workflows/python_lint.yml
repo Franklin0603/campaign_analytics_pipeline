@@ -17,10 +17,10 @@ jobs:
 
     steps:
       - name: Checkout code
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
 
       - name: Set up Python
-        uses: actions/setup-python@v4
+        uses: actions/setup-python@v5
         with:
           python-version: '3.11'
 
@@ -30,13 +30,13 @@ jobs:
 
       - name: Run Black (formatting check)
         run: |
-          black --check --diff pipeline/ || echo "Black formatting issues found (not blocking)"
+          black --check --diff pipeline/ scripts/ || echo "Black formatting issues found (not blocking)"
 
       - name: Run isort (import sorting check)
         run: |
-          isort --check-only --diff pipeline/ || echo "Import sorting issues found (not blocking)"
+          isort --check-only --diff pipeline/ scripts/ || echo "Import sorting issues found (not blocking)"
 
       - name: Run Flake8 (style guide)
         run: |
-          flake8 pipeline/ --count --select=E9,F63,F7,F82 --show-source --statistics
-          flake8 pipeline/ --count --exit-zero --max-complexity=10 --max-line-length=127 --statistics
+          flake8 pipeline/ scripts/ --count --select=E9,F63,F7,F82 --show-source --statistics
+          flake8 pipeline/ scripts/ --count --exit-zero --max-complexity=10 --max-line-length=127 --statistics
