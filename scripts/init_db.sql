@@ -41,6 +41,7 @@ CREATE TABLE IF NOT EXISTS silver.advertisers (
     advertiser_name VARCHAR(255) NOT NULL,
     industry VARCHAR(100) NOT NULL,
     country VARCHAR(10) NOT NULL,
+    account_manager VARCHAR(255),
     _silver_processed_at TIMESTAMP NOT NULL
 );
 

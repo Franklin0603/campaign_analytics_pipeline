@@ -15,13 +15,13 @@ CREATE TABLE IF NOT EXISTS silver.campaigns (
     _silver_processed_at TIMESTAMP NOT NULL
 );
 
--- Advertisers table
+-- Advertisers table (WITH account_manager)
 CREATE TABLE IF NOT EXISTS silver.advertisers (
     advertiser_id INTEGER PRIMARY KEY,
     advertiser_name VARCHAR(255) NOT NULL,
     industry VARCHAR(100) NOT NULL,
     country VARCHAR(10) NOT NULL,
-    account_manager VARCHAR(255) NOT NULL,
+    account_manager VARCHAR(255),
     _silver_processed_at TIMESTAMP NOT NULL
 );
 

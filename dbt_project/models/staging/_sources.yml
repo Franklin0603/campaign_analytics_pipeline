@@ -31,6 +31,12 @@ sources:
             description: "Industry vertical"
             tests:
               - not_null
+
+          - name: account_manager
+            description: "Industry vertical"
+            tests:
+              - not_null
+
           
           - name: country
             description: "Country code"
