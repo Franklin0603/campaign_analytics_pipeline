@@ -22,6 +22,9 @@ This project demonstrates a **production-ready data pipeline** for campaign anal
 - ✅ **Docker** for easy setup and reproducibility
 - ✅ **CI/CD** with GitHub Actions (automated testing)
 - ✅ **Modular, testable, and maintainable** code structure
+
+### Architecture
+```
 ┌─────────────────┐
 │  BRONZE LAYER   │  ← Raw data preservation
 │  (PySpark)      │     • Campaigns

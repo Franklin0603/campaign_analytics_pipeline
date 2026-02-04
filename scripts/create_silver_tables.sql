@@ -1,27 +1,6 @@
--- Create schemas for data pipeline layers
-CREATE SCHEMA IF NOT EXISTS bronze;
-CREATE SCHEMA IF NOT EXISTS silver;
-CREATE SCHEMA IF NOT EXISTS staging;
-CREATE SCHEMA IF NOT EXISTS intermediate;
-CREATE SCHEMA IF NOT EXISTS core;
-CREATE SCHEMA IF NOT EXISTS analytics;
-CREATE SCHEMA IF NOT EXISTS gold;
-CREATE SCHEMA IF NOT EXISTS snapshots;
+-- Create silver layer tables matching dbt source schema
 
--- Grant permissions
-GRANT ALL PRIVILEGES ON SCHEMA bronze TO dbt_user;
-GRANT ALL PRIVILEGES ON SCHEMA silver TO dbt_user;
-GRANT ALL PRIVILEGES ON SCHEMA staging TO dbt_user;
-GRANT ALL PRIVILEGES ON SCHEMA intermediate TO dbt_user;
-GRANT ALL PRIVILEGES ON SCHEMA core TO dbt_user;
-GRANT ALL PRIVILEGES ON SCHEMA analytics TO dbt_user;
-GRANT ALL PRIVILEGES ON SCHEMA gold TO dbt_user;
-GRANT ALL PRIVILEGES ON SCHEMA snapshots TO dbt_user;
-
--- Set search path
-ALTER DATABASE campaign_analytics SET search_path TO gold,core,analytics,intermediate,staging,silver,bronze,public;
-
--- Create silver layer tables for CI testing
+-- Campaigns table
 CREATE TABLE IF NOT EXISTS silver.campaigns (
     campaign_id INTEGER PRIMARY KEY,
     campaign_name VARCHAR(255) NOT NULL,
@@ -36,14 +15,17 @@ CREATE TABLE IF NOT EXISTS silver.campaigns (
     _silver_processed_at TIMESTAMP NOT NULL
 );
 
+-- Advertisers table
 CREATE TABLE IF NOT EXISTS silver.advertisers (
     advertiser_id INTEGER PRIMARY KEY,
     advertiser_name VARCHAR(255) NOT NULL,
     industry VARCHAR(100) NOT NULL,
     country VARCHAR(10) NOT NULL,
+    account_manager VARCHAR(255) NOT NULL,
     _silver_processed_at TIMESTAMP NOT NULL
 );
 
+-- Performance table
 CREATE TABLE IF NOT EXISTS silver.performance (
     performance_id INTEGER PRIMARY KEY,
     campaign_id INTEGER NOT NULL,
@@ -56,6 +38,7 @@ CREATE TABLE IF NOT EXISTS silver.performance (
     _silver_processed_at TIMESTAMP NOT NULL
 );
 
+-- Create indexes for better query performance
 CREATE INDEX IF NOT EXISTS idx_campaigns_advertiser ON silver.campaigns(advertiser_id);
 CREATE INDEX IF NOT EXISTS idx_performance_campaign ON silver.performance(campaign_id);
 CREATE INDEX IF NOT EXISTS idx_performance_date ON silver.performance(date);
