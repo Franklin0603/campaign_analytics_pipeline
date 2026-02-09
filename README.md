@@ -41,12 +41,54 @@ This project demonstrates a **production-ready data pipeline** for campaign anal
 └────────┬────────┘
          ↓
 ┌─────────────────┐
-│   GOLD LAYER    │  ← Analytics-ready models
-│   (dbt)         │     • Dimension tables
-│                 │     • Fact tables
-│  PostgreSQL     │     • Aggregations
+│   GOLD LAYER    │  ← dbt: Analytics-ready
+│   (dbt)         │
+│                 │     📋 Staging (3 models)
+│                 │        ↓
+│                 │     ⚙️  Intermediate (2 models)
+│                 │        ↓
+│                 │     🏛️  Marts (4 models)
+│                 │        • 2 Dimensions
+│                 │        • 1 Fact (incremental)
+│                 │        • 1 Analytics
+└────────┬────────┘
+         ↓
+┌─────────────────┐
+│  BI/Analytics   │  ← Tableau, Looker, Excel
 └─────────────────┘
 ```
+
+**For interactive diagrams:** [View on GitHub →](docs/architecture/diagrams.md)
+
+
+## 📐 Architecture
+
+### High-Level Overview
+```mermaid
+graph LR
+    A[📄 CSV Files] --> B[🔶 Bronze<br/>PySpark]
+    B --> C[⚪ Silver<br/>PySpark + GE]
+    C --> D[🟡 Gold<br/>dbt]
+    D --> E[📊 BI Tools]
+    
+    style A fill:#e0e0e0
+    style B fill:#ff9800
+    style C fill:#9e9e9e
+    style D fill:#ffd700
+    style E fill:#4caf50
+```
+
+**📊 [View Complete Architecture Diagrams →](docs/architecture/diagrams.md)**
+
+Includes:
+- End-to-end pipeline flow
+- dbt DAG with lineage
+- Star schema ERD
+- CI/CD pipeline
+- Test coverage
+- Data refresh schedule
+
+---
 
 ## 🚀 Quick Start
 
