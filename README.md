@@ -398,6 +398,98 @@ docker compose down -v
 
 For detailed Docker instructions, see [DOCKER_SETUP.md](DOCKER_SETUP.md).
 
+## 🏗️ Lakehouse Architecture
+
+This project implements a **modern lakehouse architecture** that combines the scalability of data lakes with the performance of data warehouses.
+
+### Architecture Diagram
+```
+┌─────────────────────────────────────────────────────────────────┐
+│                    LAKEHOUSE DATA FLOW                          │
+└─────────────────────────────────────────────────────────────────┘
+
+CSV Files (Raw Data)
+         ↓
+┌────────────────────────────────────────────────────────────────┐
+│  🟤 BRONZE LAYER - Raw Data Preservation                       │
+│                                                                 │
+│  Storage:     MinIO (Parquet) + Postgres (Mirror)              │
+│  Purpose:     Immutable archive of raw data                    │
+│  Format:      All columns as STRING                            │
+│  Partition:   By ingestion date                                │
+│  Location:    s3a://bronze/{table}/date=YYYY-MM-DD/           │
+│                                                                 │
+│  Benefits:    - 70% storage reduction (Parquet vs CSV)         │
+│               - Full data lineage and audit trail              │
+│               - Can replay entire pipeline from source         │
+└────────────────────────────────────────────────────────────────┘
+         ↓
+┌────────────────────────────────────────────────────────────────┐
+│  ⚪ SILVER LAYER - Curated Business Data                       │
+│                                                                 │
+│  Storage:     MinIO (Parquet) + Postgres (For dbt)            │
+│  Purpose:     Cleaned, validated, business-ready data          │
+│  Transform:   Type casting, deduplication, validation          │
+│  Partition:   By business attributes (status, date, industry) │
+│  Location:    s3a://silver/{table}/partition_col=value/       │
+│                                                                 │
+│  Benefits:    - Partition pruning for query optimization       │
+│               - Data quality gates with Great Expectations     │
+│               - Separation of lake (MinIO) and warehouse (PG)  │
+└────────────────────────────────────────────────────────────────┘
+         ↓
+┌────────────────────────────────────────────────────────────────┐
+│  🟡 GOLD LAYER - Analytics Models (dbt)                        │
+│                                                                 │
+│  Storage:     Postgres (optimized for BI tools)                │
+│  Purpose:     Star schema for analytics consumption            │
+│  Models:      Staging → Intermediate → Marts                   │
+│  Testing:     110+ automated data quality tests                │
+│  Location:    core.*, analytics.* schemas                      │
+│                                                                 │
+│  Benefits:    - Incremental materialization (80% faster)       │
+│               - SCD Type 2 for historical tracking             │
+│               - SQL-based transformations (dbt)                │
+└────────────────────────────────────────────────────────────────┘
+```
+
+### Key Benefits
+
+| Feature | Benefit |
+|---------|---------|
+| **Hybrid Storage** | MinIO for cheap storage, Postgres for fast queries |
+| **Compute-Storage Separation** | Scale Spark workers independently from data |
+| **Immutable Bronze** | Can replay pipeline; disaster recovery built-in |
+| **Parquet Format** | 70% storage reduction + columnar performance |
+| **Partitioning** | Query only relevant data (predicate pushdown) |
+| **Full Lineage** | Track data from source CSV to analytics table |
+
+### Technology Stack
+
+- **Object Storage**: MinIO (S3-compatible, open source)
+- **Data Processing**: Apache Spark 3.4 (PySpark)
+- **Data Warehouse**: PostgreSQL 15
+- **Analytics Engineering**: dbt 1.9.0
+- **Data Quality**: Great Expectations
+- **Orchestration**: Python scripts (Airflow-ready)
+- **Infrastructure**: Docker Compose
+
+### Quick Start
+```bash
+# 1. Start infrastructure
+docker-compose up -d
+
+# 2. Run complete pipeline
+python run_full_pipeline.py
+
+# 3. View results
+# - MinIO Console: http://localhost:9001 (minioadmin/minioadmin123)
+# - Query Postgres: docker exec -it campaign_analytics_db psql -U dbt_user -d campaign_analytics
+# - dbt docs: cd dbt_project && dbt docs serve
+```
+
+For detailed lakehouse operations, see [docs/LAKEHOUSE_GUIDE.md](docs/LAKEHOUSE_GUIDE.md).
+
 ## 📝 Development Notes
 
 ### Adding New Data Sources

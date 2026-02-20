@@ -1,18 +1,28 @@
+# config/database.yaml - Safe to commit to Git
+# Uses ${VAR_NAME} syntax to read from .env file
+
 postgres:
-  host: localhost
-  port: 5432
-  database: campaign_analytics
-  user: postgres
-  password: ""  # Leave empty if no password, or add your password
+  host: ${POSTGRES_HOST}
+  port: ${POSTGRES_PORT}
+  database: ${POSTGRES_DB}
+  user: ${POSTGRES_USER}
+  password: ${POSTGRES_PASSWORD}
   
-  # JDBC settings for PySpark
-  jdbc_url: jdbc:postgresql://localhost:5432/campaign_analytics
+  # JDBC settings
+  jdbc_url: jdbc:postgresql://${POSTGRES_HOST}:${POSTGRES_PORT}/${POSTGRES_DB}
   driver: org.postgresql.Driver
-  jar_path: lib/postgresql-42.6.0.jar
-  
-  # Schemas
-  schemas:
-    bronze: bronze
-    silver: silver
-    gold: gold
-    analytics: analytics
+  jar_path: ${JDBC_DRIVER_PATH}
+
+# Schemas
+schemas:
+  bronze: bronze
+  silver: silver
+  gold: gold
+  analytics: analytics
+
+# MinIO (for documentation, actual config in minio_config.py)
+minio:
+  endpoint: ${MINIO_ENDPOINT}
+  access_key: ${MINIO_ACCESS_KEY}
+  secret_key: ${MINIO_SECRET_KEY}
+  secure: ${MINIO_SECURE}

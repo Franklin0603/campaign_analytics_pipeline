@@ -8,18 +8,68 @@ services:
       POSTGRES_USER: dbt_user
       POSTGRES_PASSWORD: dbt_password
       POSTGRES_DB: campaign_analytics
-      POSTGRES_HOST_AUTH_METHOD: trust
     ports:
       - "5432:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
       - ./scripts/init_db.sql:/docker-entrypoint-initdb.d/init.sql
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U dbt_user -d campaign_analytics"]
+      test: ["CMD-SHELL", "pg_isready -U dbt_user"]
       interval: 10s
       timeout: 5s
       retries: 5
+    networks:
+      - campaign_network
+
+  minio:
+    image: minio/minio:latest
+    container_name: campaign_minio
+    ports:
+      - "9000:9000"   # S3 API endpoint
+      - "9001:9001"   # Web Console
+    environment:
+      MINIO_ROOT_USER: minioadmin
+      MINIO_ROOT_PASSWORD: minioadmin123
+    command: server /data --console-address ":9001"
+    volumes:
+      - minio_data:/data
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:9000/minio/health/live"]
+      interval: 30s
+      timeout: 20s
+      retries: 3
+    networks:
+      - campaign_network
+
+  minio-init:
+    image: minio/mc:latest
+    container_name: campaign_minio_init
+    depends_on:
+      minio:
+        condition: service_healthy
+    entrypoint: >
+      /bin/sh -c "
+      echo '⏳ Waiting for MinIO to be ready...';
+      sleep 5;
+      echo '🔧 Configuring MinIO alias...';
+      mc alias set local http://minio:9000 minioadmin minioadmin123;
+      echo '📦 Creating buckets...';
+      mc mb local/bronze --ignore-existing;
+      mc mb local/silver --ignore-existing;
+      mc mb local/logs --ignore-existing;
+      mc mb local/data-quality --ignore-existing;
+      echo '✅ MinIO buckets created successfully!';
+      echo '📋 Bucket list:';
+      mc ls local;
+      exit 0;
+      "
+    networks:
+      - campaign_network
+
+networks:
+  campaign_network:
+    driver: bridge
 
 volumes:
   postgres_data:
-    driver: local
+  minio_data:

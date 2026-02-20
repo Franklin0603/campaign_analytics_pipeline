@@ -1,75 +1,151 @@
 """
-Bronze Layer: Ingest Campaigns CSV to PostgreSQL
-Preserves raw data exactly as received
+Bronze Layer - Campaign Ingestion
 """
-
 import sys
-import os
-
-# Add parent directory to path
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
-
-from pyspark.sql.functions import current_timestamp, lit
+from pathlib import Path
 from datetime import datetime
-from utils.spark_postgres import create_spark_session, write_to_postgres
+
+project_root = Path(__file__).parent.parent.parent
+sys.path.insert(0, str(project_root))
+
+from pyspark.sql import SparkSession
+from pyspark.sql.functions import col, current_timestamp, current_date, lit
+from config.minio_config import minio_config
+from pipeline.utils.spark_postgres import get_postgres_properties
+
+# Delta Lake imports
+from delta import configure_spark_with_delta_pip
 
 
-def ingest_campaigns_to_bronze(csv_path="data/raw/campaigns.csv"):
+def create_spark_session():
     """
-    Ingest campaigns CSV to Bronze layer
+    Create Spark session with Delta Lake 2.4 support.
     
-    Bronze layer principles:
-    - Preserve all raw data
-    - All columns as STRING type
-    - Add metadata columns for lineage
-    - No transformations or validations
+    Returns:
+        SparkSession: Configured Spark session with Delta Lake
     """
+    # Compatible Delta Lake configuration for Spark 3.4
+    packages = [
+        "org.apache.hadoop:hadoop-aws:3.3.4",
+        "com.amazonaws:aws-java-sdk-bundle:1.12.262",
+        "org.postgresql:postgresql:42.6.0",
+    ]
+
+    builder = SparkSession.builder \
+        .appName("BronzeLayer-Campaigns") \
+        .config("spark.sql.extensions", "io.delta.sql.DeltaSparkSessionExtension") \
+        .config("spark.sql.catalog.spark_catalog", "org.apache.spark.sql.delta.catalog.DeltaCatalog")
     
-    print("=" * 70)
-    print("🔵 BRONZE INGESTION: Campaigns")
-    print("=" * 70)
+    # Add MinIO S3 configurations
+    for key, value in minio_config.get_spark_config().items():
+        builder = builder.config(key, value)
     
-    # Create Spark session
-    spark = create_spark_session("Bronze - Campaigns")
+    # Configure with Delta Lake and extra packages
+    spark = configure_spark_with_delta_pip(builder, extra_packages=packages).getOrCreate()
     
-    # Read CSV (all columns as STRING to preserve raw data)
-    print(f"\n📂 Reading CSV: {csv_path}")
-    df = spark.read \
-        .option("header", "true") \
-        .option("inferSchema", "false") \
-        .csv(csv_path)
+    return spark
+
+
+def ingest_campaigns():
+    """
+    Ingest campaigns from CSV to Bronze layer with Delta Lake format.
     
-    print(f"✅ Read {df.count()} rows")
-    print(f"   Columns: {len(df.columns)}")
+    Architecture:
+        CSV → PySpark → [Delta Lake (MinIO) + Postgres (JDBC)]
     
-    # Add Bronze metadata columns
-    df_bronze = df \
-        .withColumn("_source_file", lit(csv_path)) \
-        .withColumn("_source_system", lit("csv_upload")) \
-        .withColumn("_ingestion_timestamp", current_timestamp()) \
-        .withColumn("_batch_id", lit(datetime.now().strftime("%Y%m%d_%H%M%S")))
+    Strategy:
+        1. Read raw CSV (all columns as STRING)
+        2. Add metadata columns for lineage
+        3. Write to MinIO as Delta Lake format (ACID, versioning)
+        4. Write to Postgres for querying (silver layer input)
+    """
+    spark = create_spark_session()
     
-    # Show sample
-    print("\n📊 Sample Bronze data:")
-    df_bronze.show(3, truncate=False)
+    try:
+        print("=" * 80)
+        print("BRONZE LAYER INGESTION - CAMPAIGNS (DELTA LAKE)")
+        print("=" * 80)
+        
+        # ===== READ RAW DATA =====
+        csv_path = f"{project_root}/data/raw/campaigns.csv"
+        print(f"\n📂 Reading CSV: {csv_path}")
+        
+        raw_df = spark.read.csv(
+            csv_path,
+            header=True,
+            inferSchema=False
+        )
+        
+        record_count = raw_df.count()
+        print(f"✅ Loaded {record_count} records")
+        print(f"   Columns: {', '.join(raw_df.columns)}")
+        
+        # ===== ADD METADATA =====
+        # Add ingest_date as a column, not path
+        batch_id = datetime.now().strftime("%Y%m%d_%H%M%S")
+
+        bronze_df = raw_df \
+            .withColumn("_ingestion_timestamp", current_timestamp()) \
+            .withColumn("_source_file", lit("campaigns.csv")) \
+            .withColumn("_batch_id", lit(batch_id)) \
+            .withColumn("ingest_date", current_date())
+        
+        print(f"\n📝 Added metadata:")
+        print(f"   Batch ID: {batch_id}")
+        
+        # ===== WRITE TO DELTA LAKE (MINIO) =====
+        delta_path = minio_config.get_s3_path("bronze", "campaigns") 
+                
+        print(f"\n💾 Writing to Delta Lake (MinIO):")
+        print(f"   Path: {delta_path}")
+        print(f"   Format: Delta Lake 2.4 (ACID + Versioning)")
+        
+        # Partition BY ingest_date column
+        bronze_df.write \
+            .format("delta") \
+            .mode("append") \
+            .partitionBy("ingest_date") \
+            .save(delta_path)
+        
+        print(f"✅ Delta Lake write successful")
+        
+        # ===== WRITE TO POSTGRES (QUERYABLE MIRROR) =====
+        postgres_props = get_postgres_properties()
+        
+        print(f"\n💾 Writing to Postgres:")
+        print(f"   Table: bronze.raw_campaigns")
+        
+        bronze_df.write \
+            .jdbc(
+                url=postgres_props["url"],
+                table="bronze.raw_campaigns",
+                mode="append",
+                properties=postgres_props
+            )
+        
+        print(f"✅ Postgres write successful")
+        
+        # ===== SUMMARY =====
+        print("\n" + "=" * 80)
+        print("📊 INGESTION SUMMARY")
+        print("=" * 80)
+        print(f"Total Records:     {record_count}")
+        print(f"Total Columns:     {len(bronze_df.columns)}")
+        print(f"Delta Lake Path:   {delta_path}")
+        print(f"Postgres Table:    bronze.raw_campaigns")
+        print(f"Format:            Delta Lake (Parquet + Transaction Log)")
+        print(f"Status:            ✅ SUCCESS")
+        print("=" * 80 + "\n")
+        
+    except Exception as e:
+        print(f"\n❌ ERROR during ingestion: {str(e)}")
+        import traceback
+        traceback.print_exc()
+        raise
     
-    # Write to PostgreSQL bronze schema
-    write_to_postgres(
-        df=df_bronze,
-        table_name="raw_campaigns",
-        schema="bronze",
-        mode="append"
-    )
-    
-    spark.stop()
-    print("✅ Bronze ingestion complete!\n")
-    
-    return True
+    finally:
+        spark.stop()
 
 
 if __name__ == "__main__":
-    try:
-        ingest_campaigns_to_bronze()
-    except Exception as e:
-        print(f"❌ Error: {e}")
-        sys.exit(1)
+    ingest_campaigns()

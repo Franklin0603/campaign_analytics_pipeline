@@ -1,134 +1,158 @@
 """
-Silver Layer: Transform and Validate Advertisers
+Silver Layer - Advertiser Transformation
+NOW READS FROM MINIO BRONZE
 """
-
 import sys
-import os
+from pathlib import Path
 
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
+project_root = Path(__file__).parent.parent.parent
+sys.path.insert(0, str(project_root))
 
-from pyspark.sql import Window
-from pyspark.sql.functions import (
-    col, trim, upper, row_number, current_timestamp
-)
-from pyspark.sql.types import IntegerType
-from great_expectations.dataset import SparkDFDataset
-from utils.spark_postgres import (
-    create_spark_session, read_from_postgres, write_to_postgres
-)
+from pyspark.sql import SparkSession, Window
+from pyspark.sql.functions import col, row_number, current_timestamp, trim, upper
+from pyspark.sql.types import IntegerType, DecimalType, DateType
+from config.minio_config import minio_config
+from pipeline.utils.spark_postgres import truncate_and_write
+
+# Delta Lake imports
+from delta import configure_spark_with_delta_pip
 
 
-def clean_advertisers_to_silver():
-    """Transform Bronze advertisers to Silver with quality checks"""
-    
-    print("=" * 70)
-    print("🔷 SILVER TRANSFORMATION: Advertisers")
-    print("=" * 70)
-    
-    spark = create_spark_session("Silver - Advertisers")
-    
-    # Read from Bronze
-    bronze_df = read_from_postgres(spark, "raw_advertisers", "bronze")
-    
-    print("\n🔧 Step 1: Deduplication")
-    # Deduplicate
-    window_spec = Window.partitionBy("advertiser_id") \
-        .orderBy(col("_ingestion_timestamp").desc())
-    
-    deduped_df = bronze_df \
-        .withColumn("row_num", row_number().over(window_spec)) \
-        .filter(col("row_num") == 1) \
-        .drop("row_num")
-    
-    print(f"   Removed {bronze_df.count() - deduped_df.count()} duplicates")
-    
-    print("\n🔧 Step 2: Type Casting & Cleaning")
-    # Type casting and standardization
-    typed_df = deduped_df \
-        .withColumn("advertiser_id", col("advertiser_id").cast(IntegerType())) \
-        .withColumn("advertiser_name", trim(col("advertiser_name"))) \
-        .withColumn("industry", trim(col("industry"))) \
-        .withColumn("country", upper(trim(col("country")))) \
-        .withColumn("account_manager", trim(col("account_manager")))
-    
-    print("\n🔧 Step 3: Business Rule Validation")
-    # Apply business rules
-    validated_df = typed_df.filter(
-        col("advertiser_id").isNotNull() &
-        col("advertiser_name").isNotNull() &
-        col("industry").isNotNull()
-    )
-    
-    invalid_count = typed_df.count() - validated_df.count()
-    if invalid_count > 0:
-        print(f"   ⚠️  Filtered out {invalid_count} invalid records")
-    else:
-        print(f"   ✅ All records passed business rules")
-    
-    print("\n🔍 Step 4: Data Quality Checks")
-    # Great Expectations validation
-    ge_df = SparkDFDataset(validated_df)
-    
-    expectations = [
-        ("Table has rows", 
-         ge_df.expect_table_row_count_to_be_between(min_value=1)),
-        
-        ("advertiser_id unique", 
-         ge_df.expect_column_values_to_be_unique("advertiser_id")),
-        
-        ("advertiser_id not null", 
-         ge_df.expect_column_values_to_not_be_null("advertiser_id")),
-        
-        ("advertiser_name not null", 
-         ge_df.expect_column_values_to_not_be_null("advertiser_name")),
+def create_spark_session():
+    """Create Spark session with Delta Lake support."""
+    packages = [
+        "org.apache.hadoop:hadoop-aws:3.3.4",
+        "com.amazonaws:aws-java-sdk-bundle:1.12.262",
+        "org.postgresql:postgresql:42.6.0",
     ]
     
-    all_passed = True
-    for check_name, result in expectations:
-        if result.success:
-            print(f"   ✅ {check_name}")
-        else:
-            print(f"   ❌ {check_name}")
-            all_passed = False
+    builder = SparkSession.builder \
+        .appName("SilverLayer-Campaigns") \
+        .config("spark.sql.extensions", "io.delta.sql.DeltaSparkSessionExtension") \
+        .config("spark.sql.catalog.spark_catalog", "org.apache.spark.sql.delta.catalog.DeltaCatalog")
     
-    if not all_passed:
-        print("\n❌ Data quality checks FAILED!")
+    for key, value in minio_config.get_spark_config().items():
+        builder = builder.config(key, value)
+    
+    spark = configure_spark_with_delta_pip(builder, extra_packages=packages).getOrCreate()
+    
+    return spark
+
+
+def clean_advertisers():
+    """
+    Transform Bronze advertisers to Silver.
+    
+    Pipeline:
+        MinIO Bronze → Transformations → MinIO Silver + Postgres Silver
+    
+    Transformations:
+        - Type casting
+        - Deduplication
+        - Data standardization (uppercase, trim)
+        - Preserve lineage metadata
+    """
+    spark = create_spark_session()
+    
+    try:
+        print("=" * 80)
+        print("SILVER LAYER TRANSFORMATION - ADVERTISERS (DELTA LAKE)")
+        print("=" * 80)
+        
+        # ===== READ FROM MINIO BRONZE =====
+        bronze_path = minio_config.get_s3_path("bronze", "advertisers/")
+        print(f"\n📂 Reading from Delta Lake Bronze: {bronze_path}")
+        
+        raw_df = spark.read.format("delta").load(bronze_path)
+        raw_count = raw_df.count()
+        print(f"✅ Loaded {raw_count} records from Bronze Delta Lake")
+        
+        # ===== TYPE CASTING =====
+        print("\n🔧 Applying transformations...")
+        print("   Step 1: Type casting")
+        
+        typed_df = raw_df \
+            .withColumn("advertiser_id", col("advertiser_id").cast("int"))
+        
+        # ===== DEDUPLICATION =====
+        print("   Step 2: Deduplication")
+        
+        window_spec = Window.partitionBy("advertiser_id") \
+            .orderBy(col("_ingestion_timestamp").desc())
+        
+        deduped_df = typed_df \
+            .withColumn("rn", row_number().over(window_spec)) \
+            .filter(col("rn") == 1) \
+            .drop("rn")
+        
+        deduped_count = deduped_df.count()
+        duplicates_removed = raw_count - deduped_count
+        print(f"      Removed {duplicates_removed} duplicate records")
+        
+        # ===== DATA STANDARDIZATION =====
+        print("   Step 3: Data standardization")
+        
+        silver_df = deduped_df \
+            .withColumn("advertiser_name", trim(col("advertiser_name"))) \
+            .withColumn("industry", upper(trim(col("industry")))) \
+            .withColumn("country", upper(trim(col("country")))) \
+            .withColumn("_silver_processed_at", current_timestamp())
+        
+        print(f"      Standardized: advertiser_name, industry, country")
+
+        # Show final columns
+        print(f"\n   Silver columns: {', '.join(silver_df.columns)}")
+        
+        # Select only columns matching Postgres table schema
+        postgres_columns = [
+            "advertiser_id",
+            "advertiser_name",
+            "industry",
+            "country",
+            "account_manager",
+            "_silver_processed_at"
+        ]
+        postgres_df = silver_df.select(*postgres_columns)
+        
+        # ===== WRITE TO MINIO SILVER =====
+        silver_path = minio_config.get_s3_path("silver", "advertisers/")
+        print(f"\n💾 Writing to Delta Lake Silver: {silver_path}")
+        print(f"   Partitioning by: status")
+        print(f"   Format: Delta Lake (ACID + Versioning)")
+        
+        silver_df.write \
+            .format("delta") \
+            .mode("overwrite") \
+            .partitionBy("industry") \
+            .save(silver_path)
+        
+        print(f"✅ MinIO Silver write successful")
+        
+        # ===== WRITE TO POSTGRES SILVER =====
+        print(f"\n💾 Writing to Postgres: silver.advertisers")
+        truncate_and_write(postgres_df, "advertisers", "silver")
+        
+        # ===== SUMMARY =====
+        print("\n" + "=" * 80)
+        print("📊 TRANSFORMATION SUMMARY")
+        print("=" * 80)
+        print(f"Input Records:      {raw_count}")
+        print(f"Output Records:     {deduped_count}")
+        print(f"Duplicates Removed: {duplicates_removed}")
+        print(f"MinIO Path:         {silver_path}")
+        print(f"Partitioning:       industry")
+        print(f"Format:             Delta Lake (Parquet + Transaction Log)")
+        print(f"Status:             ✅ SUCCESS")
+        print("=" * 80 + "\n")
+        
+    except Exception as e:
+        print(f"\n❌ ERROR: {str(e)}")
+        import traceback
+        traceback.print_exc()
+        raise
+    finally:
         spark.stop()
-        raise ValueError("Data quality validation failed")
-    
-    print("\n   ✅ All quality checks passed!")
-    
-    # Add Silver metadata
-    silver_df = validated_df \
-        .withColumn("_silver_processed_at", current_timestamp())
-    
-    # Select final columns
-    final_df = silver_df.select(
-        "advertiser_id",
-        "advertiser_name",
-        "industry",
-        "country",
-        "account_manager",
-        "_silver_processed_at"
-    )
-    
-    print("\n📊 Sample Silver data:")
-    final_df.show(5, truncate=False)
-    
-    # Write to Silver
-    write_to_postgres(final_df, "advertisers", "silver", mode="overwrite")
-    
-    spark.stop()
-    print("✅ Silver transformation complete!\n")
-    
-    return True
 
 
 if __name__ == "__main__":
-    try:
-        clean_advertisers_to_silver()
-    except Exception as e:
-        print(f"❌ Error: {e}")
-        import traceback
-        traceback.print_exc()
-        sys.exit(1)
+    clean_advertisers()

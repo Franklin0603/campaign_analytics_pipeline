@@ -1,60 +1,116 @@
 """
-Bronze Layer: Ingest Advertisers CSV to PostgreSQL
+Bronze Layer - Advertiser Ingestion
 """
-
 import sys
-import os
-
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
-
-from pyspark.sql.functions import current_timestamp, lit
+from pathlib import Path
 from datetime import datetime
-from utils.spark_postgres import create_spark_session, write_to_postgres
+
+project_root = Path(__file__).parent.parent.parent
+sys.path.insert(0, str(project_root))
+
+from pyspark.sql import SparkSession
+from pyspark.sql.functions import col, current_timestamp, current_date, lit
+from config.minio_config import minio_config
+from pipeline.utils.spark_postgres import get_postgres_properties
+
+# Delta Lake imports
+from delta import configure_spark_with_delta_pip
+
+def create_spark_session():
+    """
+    Create Spark session with Delta Lake 2.4 support.
+    
+    Returns:
+        SparkSession: Configured Spark session with Delta Lake
+    """
+    # Compatible Delta Lake configuration for Spark 3.4
+    packages = [
+        "org.apache.hadoop:hadoop-aws:3.3.4",
+        "com.amazonaws:aws-java-sdk-bundle:1.12.262",
+        "org.postgresql:postgresql:42.6.0",
+    ]
+
+    builder = SparkSession.builder \
+        .appName("BronzeLayer-Campaigns") \
+        .config("spark.sql.extensions", "io.delta.sql.DeltaSparkSessionExtension") \
+        .config("spark.sql.catalog.spark_catalog", "org.apache.spark.sql.delta.catalog.DeltaCatalog")
+    
+    # Add MinIO S3 configurations
+    for key, value in minio_config.get_spark_config().items():
+        builder = builder.config(key, value)
+    
+    # Configure with Delta Lake and extra packages
+    spark = configure_spark_with_delta_pip(builder, extra_packages=packages).getOrCreate()
+    
+    return spark
 
 
-def ingest_advertisers_to_bronze(csv_path="data/raw/advertisers.csv"):
-    """Ingest advertisers CSV to Bronze layer"""
+def ingest_advertisers():
+    """
+    Ingest advertisers from CSV to Bronze layer with Delta Lake format.
+    """
+    spark = create_spark_session()
     
-    print("=" * 70)
-    print("🔵 BRONZE INGESTION: Advertisers")
-    print("=" * 70)
-    
-    spark = create_spark_session("Bronze - Advertisers")
-    
-    print(f"\n📂 Reading CSV: {csv_path}")
-    df = spark.read \
-        .option("header", "true") \
-        .option("inferSchema", "false") \
-        .csv(csv_path)
-    
-    print(f"✅ Read {df.count()} rows")
-    
-    # Add Bronze metadata
-    df_bronze = df \
-        .withColumn("_source_file", lit(csv_path)) \
-        .withColumn("_source_system", lit("csv_upload")) \
-        .withColumn("_ingestion_timestamp", current_timestamp()) \
-        .withColumn("_batch_id", lit(datetime.now().strftime("%Y%m%d_%H%M%S")))
-    
-    print("\n📊 Sample Bronze data:")
-    df_bronze.show(3, truncate=False)
-    
-    write_to_postgres(
-        df=df_bronze,
-        table_name="raw_advertisers",
-        schema="bronze",
-        mode="append"
-    )
-    
-    spark.stop()
-    print("✅ Bronze ingestion complete!\n")
-    
-    return True
+    try:
+        print("=" * 80)
+        print("BRONZE LAYER INGESTION - ADVERTISERS (DELTA LAKE)")
+        print("=" * 80)
+        
+        # Read CSV
+        csv_path = f"{project_root}/data/raw/advertisers.csv"
+        print(f"\n📂 Reading CSV: {csv_path}")
+        
+        raw_df = spark.read.csv(csv_path, header=True, inferSchema=False)
+        record_count = raw_df.count()
+        print(f"✅ Loaded {record_count} records")
+        
+        # Add metadata
+        batch_id = datetime.now().strftime("%Y%m%d_%H%M%S")
+        
+        bronze_df = raw_df \
+            .withColumn("_ingestion_timestamp", current_timestamp()) \
+            .withColumn("_source_file", lit("advertisers.csv")) \
+            .withColumn("_batch_id", lit(batch_id)) \
+            .withColumn("ingest_date", current_date())
+        
+        # Write to MinIO
+        delta_path = minio_config.get_s3_path("bronze", "advertisers")
+
+        print(f"\n💾 Writing to MinIO: {delta_path}")
+
+        bronze_df.write \
+            .format("delta") \
+            .mode("append") \
+            .partitionBy("ingest_date") \
+            .save(delta_path)
+            
+        print(f"✅ MinIO write successful")
+        
+        # Write to Postgres
+        postgres_props = get_postgres_properties()
+        print(f"\n💾 Writing to Postgres: bronze.raw_advertisers")
+        
+        bronze_df.write.jdbc(
+            url=postgres_props["url"],
+            table="bronze.raw_advertisers",
+            mode="append",
+            properties=postgres_props
+        )
+        print(f"✅ Postgres write successful")
+        
+        # Summary
+        print(f"\n📊 Ingested {record_count} advertiser records")
+        print(f"   MinIO: {delta_path}")
+        print(f"   Status: ✅ SUCCESS\n")
+        
+    except Exception as e:
+        print(f"\n❌ ERROR: {str(e)}")
+        import traceback
+        traceback.print_exc()
+        raise
+    finally:
+        spark.stop()
 
 
 if __name__ == "__main__":
-    try:
-        ingest_advertisers_to_bronze()
-    except Exception as e:
-        print(f"❌ Error: {e}")
-        sys.exit(1)
+    ingest_advertisers()
